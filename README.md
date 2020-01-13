@@ -18,13 +18,6 @@ To build EKS, run command below.
 $ make create
 ```
 
-## Destroy EKS
-To destroy EKS, run command below.
-
-```
-$ make delete
-```
-
 ## Deployment
 
 To deploy a web app (`httpbin`) and a service (`Type: Loadbalancer`), run command below.
@@ -46,4 +39,13 @@ $ curl -s $(kubectl get svc --namespace=testing test-httpbin -o jsonpath='{.stat
   "origin": "10.0.11.56",
   "url": "http://ad3daf7ce359a11eaa8b2062c62f2967-1236691161.us-west-2.elb.amazonaws.com/get"
 }
+```
+
+
+## Clean up
+
+To delete resources and destroy EKS, run command below.
+
+```
+$ make delete
 ```
