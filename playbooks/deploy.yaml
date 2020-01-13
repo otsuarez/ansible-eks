@@ -1,0 +1,50 @@
+- name: Service EKS
+  hosts: local
+  gather_facts: false
+  tasks:
+    - name: Create a k8s namespace
+      k8s:
+        name: testing
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Create a Deployment object from an inline definition
+      k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: httpbin
+            namespace: testing
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: httpbin
+                version: v1
+            template:
+              metadata:
+                labels:
+                  app: httpbin
+                  version: v1
+              spec:
+                containers:
+                - image: docker.io/kennethreitz/httpbin
+                  imagePullPolicy: IfNotPresent
+                  name: httpbin
+                  ports:
+                  - containerPort: 80
+
+    - name: Expose service port with ClusterIP using spec
+      k8s_service:
+        state: present
+        name: test-httpbin
+        namespace: testing
+        type: LoadBalancer
+        ports:
+        - port: 80
+          protocol: TCP
+        selector:
+          app: httpbin

@@ -1,0 +1,51 @@
+- name: Service EKS
+  hosts: local
+  gather_facts: false
+  tasks:
+    - name: Remove a service
+      k8s_service:
+        state: absent
+        name: test-httpbin
+        namespace: testing
+        type: LoadBalancer
+        ports:
+        - port: 80
+          protocol: TCP
+        selector:
+          app: httpbin
+
+    - name: Delete a Deployment
+      k8s:
+        state: absent
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: httpbin
+            namespace: testing
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: httpbin
+                version: v1
+            template:
+              metadata:
+                labels:
+                  app: httpbin
+                  version: v1
+              spec:
+                containers:
+                - image: docker.io/kennethreitz/httpbin
+                  imagePullPolicy: IfNotPresent
+                  name: httpbin
+                  ports:
+                  - containerPort: 80
+
+    - name: Delete a k8s namespace
+      k8s:
+        name: testing
+        api_version: v1
+        kind: Namespace
+        state: absent
+

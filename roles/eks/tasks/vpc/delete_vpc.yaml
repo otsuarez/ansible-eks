@@ -1,0 +1,161 @@
+# Gather information about all Network ACLs:
+- name: VPC | get all NACLs
+  register: all_nacls
+  ec2_vpc_nacl_info:
+    region: "{{ common.region }}"
+
+
+- name: VPC | get VPC
+  ec2_vpc_net_info:
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    filters:
+      tag:Name: "{{ vpc.name }}"
+  register: vpc_facts_results
+- name: VPC/print vpc_facts_results
+  debug:
+    var: vpc_facts_results
+- name: VPC | get route table
+  ec2_vpc_route_table_info:
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    filters:
+      vpc-id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+  register: rt_facts_results
+#
+#
+# - set_fact:
+#   nacl: item
+# - name: VPC/print all_nacls all ---
+#   debug:
+#     var: all_nacls
+
+- name: VPC/print all_nacls all ---
+  when: "item.vpc_id == vpc_facts_results.vpcs[0].vpc_id "
+  debug:
+    msg: "{{ item.nacl_id }}"
+  loop: "{{ all_nacls.nacls }}"
+
+# - name: VPC/print rt_facts_results
+#   debug:
+#     var: rt_facts_results
+# # #
+
+# - name: VPC/print rt_facts_results all ---
+#   debug:
+#     msg: "{{ item.associations }}"
+#   loop: "{{ rt_facts_results.route_tables }}"
+
+# - name: VPC/print rt_facts_results but ---
+#   # when: "item.associations is defined and item.associations[0].main != true"
+#   when:
+#     - (item.associations|length>0)
+#     - item.associations[0].main != true
+#     # - item.associations is defined
+#   debug:
+#     msg: "{{ item.associations }}"
+#   loop: "{{ rt_facts_results.route_tables }}"
+
+# - name: VPC | print delete public route table
+#   loop: "{{ rt_facts_results.route_tables }}"
+#   when: "item.associations[0] is defined and item.associations[0].main != true"
+#   debug:
+#     msg: "vpc_id: {{ vpc_facts_results.vpcs[0].vpc_id }} route_table_id: {{ item.id }}"
+#     lookup: id
+
+- name: VPC | delete public route table
+  loop: "{{ rt_facts_results.route_tables }}"
+  when:
+    - (item.associations|length>0)
+    - item.associations[0].main != true
+  ec2_vpc_route_table:
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    state: absent
+    vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+    route_table_id: "{{ item.id }}"
+    lookup: id
+#
+# - name: VPC | delete public route table
+#   loop: "{{ rt_facts_results.route_tables }}"
+#   when:
+#     - (item.associations|length>0)
+#     - item.associations[0].main == true
+#   ec2_vpc_route_table:
+#     region: "{{ common.region }}"
+#     state: absent
+#     vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+#     route_table_id: "{{ item.id }}"
+#     lookup: id
+
+- name: VPC | delete igw
+  ec2_vpc_igw:
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    state: absent
+    vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+
+- name: VPC | get security groups
+  ec2_group_info:
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    filters:
+      vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+  register: security_group_facts_results
+
+- name: VPC | set security group rule lists empty
+  loop: "{{ security_group_facts_results.security_groups }}"
+  ec2_group:
+    name: "{{ item.group_name }}"
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    description: "{{ item.description }}"
+    rules: []
+    rules_egress: []
+    purge_rules: true
+    purge_rules_egress: true
+    vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+
+- name: VPC | delete security groups
+  loop: "{{ security_group_facts_results.security_groups }}"
+  when: "item.group_name != 'default'"
+  ec2_group:
+    name: '{{ item.group_name }}'
+    # profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    state: absent
+    vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+#
+- name: VPC/print all_nacls all ---
+  when: "item.vpc_id == vpc_facts_results.vpcs[0].vpc_id "
+  set_fact:
+    nacl_id: "{{ item.nacl_id }}"
+  loop: "{{ all_nacls.nacls }}"
+
+# - name: VPC | delete nacl and subnet associations
+#   ec2_vpc_nacl:
+#     state: absent
+#     nacl_id: "{{ nacl_id }}"
+#     fatal: [127.0.0.1]: FAILED! => {"changed": false, "msg": "An error occurred (InvalidParameterValue) when calling the DeleteNetworkAcl operation: cannot delete default network ACL acl-09d9e552953ef3753"}
+
+
+
+
+
+- name: VPC | delete subnets
+  loop: "{{ subnets }}"
+  ec2_vpc_subnet:
+    #profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    state: absent
+    vpc_id: "{{ vpc_facts_results.vpcs[0].vpc_id }}"
+    cidr: "{{ item.cidr }}"
+    az: "{{ item.az }}"
+
+- name: VPC | delete VPC
+  ec2_vpc_net:
+    name: "{{ vpc.name }}"
+    #profile: "{{ common.profile }}"
+    region: "{{ common.region }}"
+    state: absent
+    cidr_block: "{{ vpc.cidr_block }}"
